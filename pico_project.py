@@ -52,6 +52,7 @@ features_list = {
     'timer' :   ("HW timer",        "timer.c",          "hardware/timer.h",     "hardware_timer"),
     'watch' :   ("HW watchdog",     "watch.c",          "hardware/watchdog.h",  "hardware_watchdog"),
     'clocks' :  ("HW clocks",       "clocks.c",         "hardware/clocks.h",    "hardware_clocks"),
+    'freertos' : ("FreeRTOS",       "port.c",           "FreeRTOS.h",           "FreeRTOS"),
 }
 
 stdlib_examples_list = {
@@ -638,7 +639,7 @@ class ProjectWindow(tk.Frame):
 
         optionsRow = 9
 
-        # output options section
+        # Console output options section
         ooptionsSubframe = ttk.LabelFrame(mainFrame, relief=tk.RIDGE, borderwidth=2, text="Console Options")
         ooptionsSubframe.grid(row=optionsRow, column=0, columnspan=5, rowspan=2, padx=5, pady=5, ipadx=5, ipady=3, sticky=tk.E+tk.W)
 
@@ -873,7 +874,7 @@ def GenerateMain(folder, projectName, features, cpp):
                     main += '\n'
             main += '\n'
 
-    main += ('    puts("Hello, world!");\n\n'
+    main += ('    printf("Hello, world!");\n\n'
              '    return 0;\n'
              '}\n'
             )
@@ -903,6 +904,9 @@ def GenerateCMake(folder, params):
                 "# Add executable. Default name is the project name, version 0.1\n\n"
                 )
 
+    cmake_header4 = ("# Pull in FreeRTOS Kernel (must be before project)\n"
+                "include(FreeRTOS_Kernel_import.cmake)\n\n")           
+
 
     filename = Path(folder) / CMAKELIST_FILENAME
 
@@ -913,11 +917,20 @@ def GenerateCMake(folder, params):
     # OK, for the path, CMake will accept forward slashes on Windows, and thats
     # seemingly a bit easier to handle than the backslashes
 
-    p = str(params.sdkPath).replace('\\','/')
+    p = str(params.sdkPath).replace('\\','/') #varible for PICO_SDK_PATH
     p = '\"' + p + '\"'
 
     file.write('set(PICO_SDK_PATH ' + p + ')\n\n')
+
+    if "freertos" in params.features:
+        rtosPath = "C:/FreeRTOS-Kernel"
+        rtosPath.replace('\\', '/')
+        rtosPath = '\"' + rtosPath + '\"'  #Varible for FREERTOS_KERNEL_PATH, comment out if not needed
+        file.write('set(FREERTOS_KERNEL_PATH ' + rtosPath + ')\n\n')
+        file.write(cmake_header4)
+
     file.write(cmake_header2)
+    
     file.write('project(' + params.projectName + ' C CXX ASM)\n')
 
     if params.exceptions:
@@ -1163,6 +1176,15 @@ def DoEverything(parent, params):
     GenerateMain('.', params.projectName, features_and_examples, params.wantCPP)
 
     GenerateCMake('.', params)
+
+    #Copy FreeRTOS_kernel_import.cmake to project folder
+    
+    if "freertos" in params.features:
+        rtosCmakePath = "C:/FreeRTOS-Kernel/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake"
+        shutil.copyfile(rtosCmakePath, projectPath / 'FreeRTOS_Kernel_import.cmake')
+    
+    
+
 
     # Create a build folder, and run our cmake project build from it
     if not os.path.exists('build'):
